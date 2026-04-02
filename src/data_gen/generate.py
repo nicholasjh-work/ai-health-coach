@@ -169,6 +169,11 @@ def _generate_sessions(
         current = m["signup_date"]
 
         while current < active_end:
+            # Skip days based on segment (casual users skip more)
+            skip_prob = {"power": 0.05, "active": 0.25, "casual": 0.55}
+            if np.random.random() < skip_prob.get(m["segment"], 0.25):
+                current += timedelta(days=1)
+                continue
             n_sessions = max(0, int(np.random.poisson(avg_sessions)))
             for _ in range(n_sessions):
                 hour = np.random.choice(range(6, 23), p=_hour_weights())
