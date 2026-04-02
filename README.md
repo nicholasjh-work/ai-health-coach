@@ -129,10 +129,10 @@ All models run locally via Ollama. No API keys needed.
 
 | Tier | Use Case | Model | Rationale |
 |------|----------|-------|-----------|
-| RESTRICTED | PHI-adjacent context | `ollama/llama3` | Health data never leaves local machine |
-| STANDARD | Coaching generation | `ollama/llama3` | Primary generation model |
-| EVALUATION | Quality scoring | `ollama/llama3` | Separate evaluation pass |
-| FALLBACK | Primary model down | `ollama/phi3` | Lighter model as backup |
+| RESTRICTED | PHI-adjacent context | `ollama/gemma3:12b` | Health data never leaves local machine |
+| STANDARD | Coaching generation | `ollama/gemma3:12b` | Primary generation model |
+| EVALUATION | Quality scoring | `ollama/gemma3:12b` | Separate evaluation pass |
+| FALLBACK | Primary model down | `ollama/llama3.1:8b` | Lighter model as backup |
 
 To swap in cloud models (Claude, GPT-4), update `src/llm/router.py` config. The compliance tier routing ensures PHI-adjacent data always stays local regardless of cloud availability.
 
