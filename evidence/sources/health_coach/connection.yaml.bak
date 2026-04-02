@@ -1,0 +1,8 @@
+name: health_coach
+type: postgres
+host: localhost
+port: 5432
+database: ai_health_coach
+user: nickhidalgo
+password: ''
+ssl: false

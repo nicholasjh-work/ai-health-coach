@@ -1,0 +1,23 @@
+ai_health_coach:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: nickhidalgo
+      password: ''
+      dbname: ai_health_coach
+      schema: public
+      threads: 4
+
+    # Snowflake-portable target (update credentials to use)
+    # snowflake:
+    #   type: snowflake
+    #   account: your_account
+    #   user: your_user
+    #   password: '{{ env_var("SNOWFLAKE_PASSWORD") }}'
+    #   database: AI_HEALTH_COACH
+    #   warehouse: COMPUTE_WH
+    #   schema: PUBLIC
+    #   threads: 4

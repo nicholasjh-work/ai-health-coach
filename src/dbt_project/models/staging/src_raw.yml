@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: members
+        description: "Member profiles with plan type, acquisition channel, segment, and churn status"
+        columns:
+          - name: member_id
+            tests: [unique, not_null]
+      - name: daily_metrics
+        description: "Daily biometric readings per member (HRV, RHR, sleep, recovery, strain)"
+        columns:
+          - name: member_id
+            tests: [not_null]
+          - name: metric_date
+            tests: [not_null]
+      - name: feature_events
+        description: "Feature engagement events (view, interact, dismiss) per member per feature"
+      - name: sessions
+        description: "App session logs with duration and platform"
+      - name: ai_evaluations
+        description: "AI-generated coaching insights with quality scores from evaluation model"
