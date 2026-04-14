@@ -30,9 +30,21 @@
 
 ### What This Does
 
-Generates personalized health coaching insights from synthetic wearable biometric data (HRV, sleep, recovery, strain) using locally-hosted LLMs. No paid API keys. No data leaves the machine.
+<table>
+<tr>
+<td>
 
-The pipeline: synthetic data generator loads 2K members and 200K+ daily biometric readings into PostgreSQL. dbt transforms raw data into coaching context windows with rolling 7/30-day averages and trend detection. LiteLLM routes prompts to local Ollama models with compliance-tier routing. A separate evaluation model scores each insight on relevance, specificity, actionability, and safety. Evidence.dev renders three dashboard pages showing coaching priorities, cohort retention, and AI quality metrics.
+**2K members** and **200K+ daily biometric readings** (HRV, sleep, recovery, strain) flow through a full analytics pipeline, from synthetic data generation into PostgreSQL, through dbt transformations with rolling 7/30-day averages and trend detection, into a coaching engine powered by locally-hosted LLMs.
+
+Each insight is generated using **segment-aware prompts** (power / active / casual), routed through **compliance-tier LLM routing** via LiteLLM + Ollama, and scored by a **separate evaluation model** on relevance, specificity, actionability, and safety.
+
+Three Evidence.dev dashboard pages render coaching priorities, cohort retention, and AI quality metrics. Deployed on Cloudflare Pages.
+
+**No paid API keys. No data leaves the machine.**
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -67,57 +79,55 @@ Synthetic Data Generator (Python, NumPy, Faker)
 
 ### dbt Models
 
-#### ![Staging](https://img.shields.io/badge/Staging-58a6ff?style=flat-square) Staging Layer
+#### ![Staging](https://img.shields.io/badge/STAGING-58a6ff?style=for-the-badge) Sources to clean typed tables
 
 | Model | Grain | Purpose |
 |:------|:------|:--------|
-| `stg_members` | 1 row per member | Clean profiles with tenure calculation |
-| `stg_daily_metrics` | 1 row per member per day | Typed biometric readings with weekend flag |
-| `stg_feature_events` | 1 row per event | Clean engagement events |
-| `stg_sessions` | 1 row per session | Clean app sessions |
+| [![stg_members](https://img.shields.io/badge/stg__members-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/staging/stg_members.sql) | 1 row per member | Clean profiles with tenure calculation |
+| [![stg_daily_metrics](https://img.shields.io/badge/stg__daily__metrics-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/staging/stg_daily_metrics.sql) | 1 row per member per day | Typed biometric readings with weekend flag |
+| [![stg_feature_events](https://img.shields.io/badge/stg__feature__events-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/staging/stg_feature_events.sql) | 1 row per event | Clean engagement events |
+| [![stg_sessions](https://img.shields.io/badge/stg__sessions-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/staging/stg_sessions.sql) | 1 row per session | Clean app sessions |
 
-#### ![Intermediate](https://img.shields.io/badge/Intermediate-d29922?style=flat-square) Intermediate Layer
-
-| Model | Grain | Purpose |
-|:------|:------|:--------|
-| `int_member_health_summary` | 1 row per member per day | 7d/30d rolling averages, HRV and recovery trends |
-| `int_feature_adoption` | 1 row per member per feature | Lifetime adoption depth and interaction rates |
-
-#### ![Mart](https://img.shields.io/badge/Mart-3fb950?style=flat-square) Mart Layer
+#### ![Intermediate](https://img.shields.io/badge/INTERMEDIATE-d29922?style=for-the-badge) Business logic and feature engineering
 
 | Model | Grain | Purpose |
 |:------|:------|:--------|
-| `mart_coaching_context` | 1 row per active member | Full coaching input: biometrics + trends + engagement + priority |
-| `mart_cohort_retention` | 1 row per cohort-week / plan / channel / segment | Point-in-time retention at D7/D14/D30/D60/D90 |
-| `mart_ai_evaluation` | 1 row per generated insight | Quality scores from evaluation model |
+| [![int_member_health_summary](https://img.shields.io/badge/int__member__health__summary-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/intermediate/int_member_health_summary.sql) | 1 row per member per day | 7d/30d rolling averages, HRV and recovery trends |
+| [![int_feature_adoption](https://img.shields.io/badge/int__feature__adoption-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/intermediate/int_feature_adoption.sql) | 1 row per member per feature | Lifetime adoption depth and interaction rates |
+
+#### ![Mart](https://img.shields.io/badge/MART-3fb950?style=for-the-badge) Consumption-ready outputs
+
+| Model | Grain | Purpose |
+|:------|:------|:--------|
+| [![mart_coaching_context](https://img.shields.io/badge/mart__coaching__context-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/marts/mart_coaching_context.sql) | 1 row per active member | Full coaching input: biometrics + trends + engagement + priority |
+| [![mart_cohort_retention](https://img.shields.io/badge/mart__cohort__retention-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/marts/mart_cohort_retention.sql) | 1 row per cohort-week / plan / channel / segment | Point-in-time retention at D7/D14/D30/D60/D90 |
+| [![mart_ai_evaluation](https://img.shields.io/badge/mart__ai__evaluation-161b22?style=flat-square&logo=dbt&logoColor=FF694B)](src/dbt_project/models/marts/mart_ai_evaluation.sql) | 1 row per generated insight | Quality scores from evaluation model |
 
 ---
 
 ### LLM Routing
 
-All models run locally via Ollama. No API keys needed.
+> All models run locally via Ollama. No API keys needed. To swap in cloud models (Claude, GPT-4), update `src/llm/router.py`. Compliance tier routing ensures PHI-adjacent data always stays local.
 
 | Tier | Model | Use Case |
 |:-----|:------|:---------|
-| ![Restricted](https://img.shields.io/badge/Restricted-f85149?style=flat-square) | `ollama/gemma3:12b` | PHI-adjacent context. Health data never leaves local machine. |
-| ![Standard](https://img.shields.io/badge/Standard-58a6ff?style=flat-square) | `ollama/gemma3:12b` | Primary coaching generation model. |
-| ![Evaluation](https://img.shields.io/badge/Evaluation-d29922?style=flat-square) | `ollama/gemma3:12b` | Separate evaluation pass for quality scoring. |
-| ![Fallback](https://img.shields.io/badge/Fallback-8b949e?style=flat-square) | `ollama/llama3.1:8b` | Lighter backup when primary model is down. |
-
-To swap in cloud models (Claude, GPT-4), update `src/llm/router.py` config. The compliance tier routing ensures PHI-adjacent data always stays local regardless of cloud availability.
+| ![Restricted](https://img.shields.io/badge/RESTRICTED-f85149?style=flat-square) | [![gemma3:12b](https://img.shields.io/badge/ollama%2Fgemma3:12b-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com/library/gemma3) | PHI-adjacent context. Health data never leaves local. |
+| ![Standard](https://img.shields.io/badge/STANDARD-58a6ff?style=flat-square) | [![gemma3:12b](https://img.shields.io/badge/ollama%2Fgemma3:12b-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com/library/gemma3) | Primary coaching generation model. |
+| ![Evaluation](https://img.shields.io/badge/EVALUATION-d29922?style=flat-square) | [![gemma3:12b](https://img.shields.io/badge/ollama%2Fgemma3:12b-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com/library/gemma3) | Separate evaluation pass for quality scoring. |
+| ![Fallback](https://img.shields.io/badge/FALLBACK-8b949e?style=flat-square) | [![llama3.1:8b](https://img.shields.io/badge/ollama%2Fllama3.1:8b-000000?style=flat-square&logo=ollama&logoColor=white)](https://ollama.com/library/llama3.1) | Lighter backup when primary is down. |
 
 ---
 
 ### Evaluation Framework
 
-Each generated insight is scored by a separate LLM call on four dimensions:
+> Each generated insight is scored by a separate LLM call on four dimensions:
 
 | Dimension | What It Measures | Target |
-|:----------|:----------------|:-------|
-| ![Relevance](https://img.shields.io/badge/Relevance-58a6ff?style=flat-square) | Does it reference the member's actual data? | **>70** |
-| ![Specificity](https://img.shields.io/badge/Specificity-d29922?style=flat-square) | Does it include specific numbers and timeframes? | **>60** |
-| ![Actionability](https://img.shields.io/badge/Actionability-3fb950?style=flat-square) | Can the member act on this in 48 hours? | **>70** |
-| ![Safety](https://img.shields.io/badge/Safety-f85149?style=flat-square) | Does it avoid medical claims or dangerous advice? | **>90** |
+|:----------|:----------------|:------:|
+| ![Relevance](https://img.shields.io/badge/Relevance-58a6ff?style=flat-square) | Does it reference the member's actual data? | ![>70](https://img.shields.io/badge/>70-16a34a?style=flat-square) |
+| ![Specificity](https://img.shields.io/badge/Specificity-d29922?style=flat-square) | Does it include specific numbers and timeframes? | ![>60](https://img.shields.io/badge/>60-16a34a?style=flat-square) |
+| ![Actionability](https://img.shields.io/badge/Actionability-3fb950?style=flat-square) | Can the member act on this in 48 hours? | ![>70](https://img.shields.io/badge/>70-16a34a?style=flat-square) |
+| ![Safety](https://img.shields.io/badge/Safety-f85149?style=flat-square) | Does it avoid medical claims or dangerous advice? | ![>90](https://img.shields.io/badge/>90-16a34a?style=flat-square) |
 
 Safety flags track medical claim frequency and ensure the coaching engine stays within guardrails.
 
@@ -127,9 +137,9 @@ Safety flags track medical claim frequency and ensure the coaching engine stays 
 
 | Page | Description |
 |:-----|:------------|
-| **Coaching Insights** | Member overview by segment, priority distribution, biometric trends, recent generated insights |
-| **Cohort Retention** | Retention curves by plan type, acquisition channel, and segment at D7/D14/D30/D60/D90 |
-| **AI Evaluation** | Prompt version A/B comparison, quality score distributions, safety flag rates, top-scored insights |
+| ![Coaching](https://img.shields.io/badge/Coaching_Insights-2563EB?style=flat-square) | Member overview by segment, priority distribution, biometric trends, recent generated insights |
+| ![Retention](https://img.shields.io/badge/Cohort_Retention-16a34a?style=flat-square) | Retention curves by plan type, acquisition channel, and segment at D7/D14/D30/D60/D90 |
+| ![Evaluation](https://img.shields.io/badge/AI_Evaluation-d29922?style=flat-square) | Prompt version A/B comparison, quality score distributions, safety flag rates, top-scored insights |
 
 ---
 
@@ -152,7 +162,7 @@ python -m src.data_gen.generate
 # Run dbt transformations
 cd src/dbt_project && dbt run --profiles-dir . && cd ../..
 
-# Generate coaching insights
+# Generate coaching insights (requires Ollama running with gemma3)
 python -m src.cli insights --n 20 --version v1
 
 # Run A/B variant
@@ -171,14 +181,14 @@ cd evidence && npx evidence dev
 
 | Component | Technology |
 |:----------|:-----------|
-| Database | PostgreSQL (Snowflake-portable SQL) |
-| Transformations | dbt (staging / intermediate / marts) |
-| LLM Routing | LiteLLM + Ollama (local, no paid APIs) |
-| Evaluation | Structured LLM scoring with JSON output parsing |
-| Dashboard | Evidence.dev |
-| Deployment | Cloudflare Pages |
-| Language | Python 3.11 |
-| CI | GitHub Actions (ruff, mypy, pytest) |
+| ![DB](https://img.shields.io/badge/Database-4169E1?style=flat-square) | PostgreSQL (Snowflake-portable SQL) |
+| ![Transform](https://img.shields.io/badge/Transforms-FF694B?style=flat-square) | dbt (staging / intermediate / marts) |
+| ![LLM](https://img.shields.io/badge/LLM_Routing-1C3C3C?style=flat-square) | LiteLLM + Ollama (local, no paid APIs) |
+| ![Eval](https://img.shields.io/badge/Evaluation-d29922?style=flat-square) | Structured LLM scoring with JSON output parsing |
+| ![Dash](https://img.shields.io/badge/Dashboard-2563EB?style=flat-square) | Evidence.dev |
+| ![Deploy](https://img.shields.io/badge/Deployment-F48120?style=flat-square) | Cloudflare Pages |
+| ![Lang](https://img.shields.io/badge/Language-3776AB?style=flat-square) | Python 3.11 |
+| ![CI](https://img.shields.io/badge/CI-333333?style=flat-square) | GitHub Actions (ruff, mypy, pytest) |
 
 ---
 
